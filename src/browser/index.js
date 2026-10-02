@@ -117,6 +117,13 @@ export default class Browser {
   }
 
   start() {
+    // stop() closes the AudioContext, so a restart may get a different device
+    // sample rate. Keep the APU in sync with the context Speakers will start.
+    const sampleRate = this._speakers.getSampleRate();
+    if (this.nes.papu.sampleRate !== sampleRate) {
+      this.nes.opts.sampleRate = sampleRate;
+      this.nes.papu.setSampleRate(sampleRate);
+    }
     this._frameTimer.start();
     this._speakers.start();
     this._fpsInterval = setInterval(() => {

@@ -91,10 +91,13 @@ export default class Speakers {
   }
 
   getSampleRate() {
-    if (this.audioCtx) {
-      return this.audioCtx.sampleRate;
+    // The NES must generate samples at the AudioContext's actual rate.
+    // Browsers commonly use 48 kHz, so assuming 44.1 kHz makes the audio
+    // underrun and causes Browser to run extra game frames.
+    if (!this.audioCtx && window.AudioContext) {
+      this.audioCtx = new window.AudioContext();
     }
-    return 44100;
+    return this.audioCtx ? this.audioCtx.sampleRate : 44100;
   }
 
   // start() is async because audioWorklet.addModule() returns a promise.
@@ -104,7 +107,7 @@ export default class Speakers {
     if (!window.AudioContext) {
       return;
     }
-    this.audioCtx = new window.AudioContext();
+    this.getSampleRate();
 
     const blob = new Blob([workletCode], { type: "application/javascript" });
     const workletUrl = URL.createObjectURL(blob);
