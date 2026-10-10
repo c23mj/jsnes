@@ -117,6 +117,13 @@ export default class Browser {
   }
 
   start() {
+    // Restored snapshots and a new output device can have different sample
+    // rates. Match the emulator to this context before generating audio.
+    const sampleRate = this._speakers.getSampleRate();
+    this.nes.opts.sampleRate = sampleRate;
+    if (this.nes.papu.sampleRate !== sampleRate) {
+      this.nes.papu.setSampleRate(sampleRate);
+    }
     this._frameTimer.start();
     this._speakers.start();
     this._fpsInterval = setInterval(() => {

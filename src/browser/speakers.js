@@ -91,6 +91,10 @@ export default class Speakers {
   }
 
   getSampleRate() {
+    // Create the context before configuring the NES so both use its actual rate.
+    if (!this.audioCtx && window.AudioContext) {
+      this.audioCtx = new window.AudioContext();
+    }
     if (this.audioCtx) {
       return this.audioCtx.sampleRate;
     }
@@ -104,7 +108,7 @@ export default class Speakers {
     if (!window.AudioContext) {
       return;
     }
-    this.audioCtx = new window.AudioContext();
+    this.getSampleRate();
 
     const blob = new Blob([workletCode], { type: "application/javascript" });
     const workletUrl = URL.createObjectURL(blob);

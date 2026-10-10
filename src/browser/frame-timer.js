@@ -18,17 +18,32 @@ export default class FrameTimer {
     this.running = true;
     this.interval = 1e3 / FPS;
     this.lastFrameTime = false;
+    this.hasUndisplayedFrame = false;
   }
 
   start() {
     this.running = true;
-    this.requestAnimationFrame();
+    // RAF timestamps can predate this call. Begin playback at the current time
+    // so the timer never catches up time from before playback started.
+    const now = window.performance.now();
+    this.lastFrameTime = now - (now % this.interval);
+    this._requestID = window.requestAnimationFrame((time) => {
+      // A delayed first display must not fast-forward unplayed startup time.
+      // Keep any lead from audio frames that have already been generated.
+      const now = window.performance.now();
+      this.lastFrameTime = Math.max(
+        this.lastFrameTime,
+        now - (now % this.interval),
+      );
+      this.onAnimationFrame(time);
+    });
   }
 
   stop() {
     this.running = false;
     if (this._requestID) window.cancelAnimationFrame(this._requestID);
     this.lastFrameTime = false;
+    this.hasUndisplayedFrame = false;
   }
 
   requestAnimationFrame() {
@@ -38,6 +53,7 @@ export default class FrameTimer {
   generateFrame() {
     this.onGenerateFrame();
     this.lastFrameTime += this.interval;
+    this.hasUndisplayedFrame = true;
   }
 
   onAnimationFrame = (time) => {
@@ -49,24 +65,18 @@ export default class FrameTimer {
     // i.e. 16.6, 33.3, etc ...
     let newFrameTime = time - excess;
 
-    // first frame, do nothing
-    if (!this.lastFrameTime) {
-      this.lastFrameTime = newFrameTime;
-      return;
-    }
-
     let numFrames = Math.round(
       (newFrameTime - this.lastFrameTime) / this.interval,
     );
 
-    // This can happen a lot on a 144Hz display
-    if (numFrames === 0) {
-      return;
+    // Audio refill may already have advanced emulation ahead of wall time.
+    if (numFrames > 0) this.generateFrame();
+    // Display new frames regardless of whether audio or this callback made them.
+    if (this.hasUndisplayedFrame) {
+      this.hasUndisplayedFrame = false;
+      this.onWriteFrame();
     }
-
-    // update display on first frame only
-    this.generateFrame();
-    this.onWriteFrame();
+    if (numFrames <= 1) return;
 
     // we generate additional frames evenly before the next
     // onAnimationFrame call.
